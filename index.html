@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auxetic App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="topnav" role="tablist" aria-label="Pagine">
+  <span class="brand">Auxetic</span>
+  <button role="tab" id="tabCell" aria-selected="false">Cella singola</button>
+  <button role="tab" id="tabPlane" aria-selected="false">Superficie piana</button>
+  <span class="navgrp">Cilindro</span>
+  <button role="tab" id="tabModel" aria-selected="true">Progetto e simulazione</button>
+  <button role="tab" id="tabPrint" aria-selected="false">Stampa 3D</button>
+  <button role="tab" id="tabBld" aria-selected="false">Bladder / restraint</button>
+  <span class="navinfo" id="navInfo"></span>
+  <button role="tab" id="tabDoc" aria-selected="false">Modelli</button>
+</nav>
+<div class="app plapp" id="pgCell" hidden><aside id="csAside"></aside><div class="vsplit" role="separator" aria-orientation="vertical" title="Trascina per cambiare la larghezza del pannello"></div><main class="plmain"><canvas id="csView" class="plview"></canvas><div class="plhud" id="csHud"></div></main></div>
+<div class="app plapp" id="pgPlane" hidden><aside id="psAside"></aside><div class="vsplit" role="separator" aria-orientation="vertical" title="Trascina per cambiare la larghezza del pannello"></div><main class="plmain"><canvas id="psView" class="plview"></canvas><div class="plhud" id="psHud"></div></main></div>
+<div class="docpage" id="pgDoc" hidden><article id="docBody"></article></div>
+<div class="app plapp" id="pgModel">
+<aside>
+  <header>
+    <h1>Tubo Auxetico</h1>
+    <p>Celle bistabili a blocchi con tagli (tesi, Cap. 5–7) avvolte su un cilindro, con parametri variabili lungo z e simulazione dell'apertura sotto pressione interna.</p>
+  </header>
+
+  <section class="step">
+    <div class="step-head"><span class="n">1</span><h2>Cilindro</h2><span class="pill" id="p1">da generare</span></div>
+    <div class="grid2">
+      <label class="f">Raggio medio R <span class="u">m</span><input type="number" id="R" value="2" min="0.001" step="0.1"></label>
+      <label class="f">Altezza H <span class="u">m</span><input type="number" id="H" value="8" min="0.001" step="0.5"></label>
+    </div>
+    <button class="go" id="b1">Genera cilindro</button>
+  </section>
+
+  <section class="step">
+    <div class="step-head"><span class="n">2</span><h2>Mesh</h2><span class="pill" id="p2">da generare</span></div>
+    <label class="f">Tipo di cella
+      <select id="type">
+        <option value="hex" selected>Esagonale · pattern a Y con triangoli rotanti</option>
+        <option value="square">Quadrata · 4 blocchi quadrati specchiati</option>
+        <option value="para">Parallelogramma · 8 blocchi triangolari</option>
+      </select>
+    </label>
+    <label class="f">Celle sulla circonferenza N<sub>c</sub><input type="number" id="Nc" value="12" min="2" max="80" step="1"></label>
+    <div class="info" id="meshinfo"></div>
+    <p class="note" id="meshnote"></p>
+    <button class="go" id="b2" disabled>Genera mesh</button>
+  </section>
+
+  <section class="step">
+    <div class="step-head"><span class="n">3</span><h2>Celle</h2><span class="pill" id="p3">da generare</span></div>
+    <div class="grid2">
+      <label class="f">Angolo di taglio θ₀ <span class="u">gradi</span><input type="number" id="theta" value="0" step="0.5" min="0"></label>
+      <label class="f">Larghezza Y₀ <span class="u">m</span><input type="number" id="y0" value="0.1" step="0.005" min="0.0001"></label>
+      <label class="f">Larghezza cerniera w <span class="u">m</span><input type="number" id="hw" value="0.005" step="0.001" min="0.0001"></label>
+      <label class="f">Spessore piastre s <span class="u">m</span><input type="number" id="thk" value="0.035" step="0.005" min="0.0001"></label>
+    </div>
+    <p class="note">Unità SI: lunghezze in m, forze in N, pressioni in atm (1 atm = 101 325 Pa). Il caso iniziale è un habitat gonfiato a 0,9 atm: cilindro di Ø 4 m × 8 m (chiuso), piastre spesse 35 mm, cerniere a lamina in PA12 (E = 1,7 GPa, larghe 5 mm, lunghe 10 mm), profilo a capsula che a 0,9 atm dà un cilindro di raggio ≈ 3,5 m con calotte semisferiche. Y è la larghezza del braccio alla radice e fissa lo scostamento dei tagli (Y = 2·t·sin(2π/N), cioè √3·t per i triangoli). θ regola solo la rastremazione verso la punta: con θ = 0 il braccio ha larghezza costante. θ₀ e Y₀ sono i valori di riferimento dei profili lungo z (passo 4). Ogni lato condiviso ha un solo scostamento, quello della riga in cui cade, quindi le celle vicine restano congruenti anche con Y diverse.</p>
+    <div class="info" id="blockinfo"></div>
+    <div class="msg" id="msg"></div>
+    <button class="go" id="b3" disabled>Genera celle</button>
+  </section>
+
+  <section class="step">
+    <div class="step-head"><span class="n">4</span><h2>Variazione lungo z</h2><span class="pill" id="pz">uniforme</span></div>
+    <label class="f">Profilo
+      <select id="preset">
+        <option value="uniforme">Uniforme</option>
+        <option value="botte">Botte · centro più aperto, estremità che si chiudono</option>
+        <option value="clessidra">Clessidra · centro più chiuso</option>
+        <option value="cono">Cono · si chiude verso l'alto</option>
+        <option value="conoinv">Cono rovesciato · si chiude verso la base</option>
+        <option value="sequenza">Sequenza · stessa forma, apertura dal basso verso l'alto</option>
+        <option value="capsula">Capsula · cilindro con calotte semisferiche alle estremità</option>
+        <option value="custom">Personalizzato</option>
+      </select>
+    </label>
+    <div class="prof3">
+      <span></span><span class="h">base</span><span class="h">centro</span><span class="h">cima</span>
+      <span class="rl">θ [°]</span><input type="number" id="thb" step="0.5"><input type="number" id="thc" step="0.5"><input type="number" id="tht" step="0.5">
+      <span class="rl">Y [m]</span><input type="number" id="yb" step="0.005" min="0.0001"><input type="number" id="yc" step="0.005" min="0.0001"><input type="number" id="yt" step="0.005" min="0.0001">
+      <span class="rl">fattore k</span><input type="number" id="fb" step="0.1" min="0.01"><input type="number" id="fc" step="0.1" min="0.01"><input type="number" id="ft" step="0.1" min="0.01">
+    </div>
+    <p class="note">Il profilo interpola i tre valori sulle righe di celle; poi puoi modificare ogni riga nella tabella. Il fattore k moltiplica tutte le rigidezze delle cerniere della riga (k, k<sub>θ</sub>, k<sub>b</sub>). I profili predefiniti modulano Y (e le rigidezze) con θ costante = θ₀; nel profilo personalizzato puoi far variare anche θ. Cerniere più rigide richiedono più pressione per aprire.</p>
+    <div class="tblwrap">
+      <table class="rows">
+        <thead><tr><th>Riga</th><th>z [m]</th><th>θ [°]</th><th>Y [m]</th><th>fattore k</th><th>k [kN/m]</th><th>R aperto* [m]</th></tr></thead>
+        <tbody id="rowsBody"></tbody>
+      </table>
+    </div>
+    <p class="note"><b>Y</b> è la larghezza alla radice dei bracci delle Y (le parti esterne unite attorno a ogni nodo) e si imposta per riga, indipendentemente da θ. Y sottili vogliono dire triangoli rotanti più grandi e più apertura; Y spesse, meno apertura. Il colore della riga segue Y.</p>
+    <p class="note">* Raggio dello stato aperto stabile della riga presa da sola (modello periodico, p = 0). Righe vicine con R diversi si raccordano: da qui nascono le forme a botte, a cono e a clessidra. Clicca una riga per vederne la cella.</p>
+  </section>
+
+  <section class="step">
+    <div class="step-head"><span class="n">5</span><h2>Apertura in pressione</h2><span class="pill" id="p4">–</span></div>
+    <div class="grid3">
+      <label class="f">k <span class="u">N/m</span><input type="number" id="kt" value="29750000" step="1000000" min="0.001"></label>
+      <label class="f">k<sub>θ</sub> <span class="u">N·m/rad</span><input type="number" id="kth" value="61.98" step="1" min="0"></label>
+      <label class="f">k<sub>b</sub> fuori piano <span class="u">N·m/rad</span><input type="number" id="kb" value="3037" step="10" min="0"></label>
+    </div>
+    <details>
+      <summary style="font-size:12px">Calcola dal materiale (eq. 5.7–5.8)</summary>
+      <div class="grid2" style="margin-top:8px">
+        <label class="f">Modulo di Young E <span class="u">MPa</span><input type="number" id="Eh" value="1700" step="100" min="0.001"></label>
+        <label class="f">Lunghezza cerniera ℓ <span class="u">m</span><input type="number" id="Lh" value="0.01" step="0.001" min="0.0001"></label>
+      </div>
+      <div class="row" style="margin-top:6px"><button class="ghost" id="bK">Applica</button><span class="note">k = E·w·s/ℓ · k<sub>θ</sub> = E·(s·w³/12)/ℓ · k<sub>b</sub> = E·(w·s³/12)/ℓ</span></div>
+    </details>
+    <label class="chk"><input type="checkbox" id="closed" checked> Estremità chiuse (la pressione spinge anche lungo l'asse)</label>
+    <label class="f">Estremità
+      <select id="ends">
+        <option value="bulkhead" selected>Bulkhead rigidi · basso fisso, alto scorrevole, elementi incernierati</option>
+        <option value="base">Base vincolata assialmente (libera in direzione radiale)</option>
+        <option value="free">Libere</option>
+      </select>
+    </label>
+    <details id="devBox">
+      <summary>Dispositivo elastico interno fra le flange</summary>
+      <label class="chk"><input type="checkbox" id="dev"> Attivo (solo con i bulkhead)</label>
+      <div class="grid3">
+        <label class="f">k lineare <span class="u">N/m</span><input type="number" id="dK1" value="100000" min="0" step="10000"></label>
+        <label class="f">k cubica <span class="u">N/m³</span><input type="number" id="dK3" value="0" min="0" step="10"></label>
+        <label class="f">Corsa libera <span class="u">m</span><input type="number" id="dS0" value="0" min="0" step="0.1"></label>
+        <label class="f">Smorzamento c <span class="u">N·s/m</span><input type="number" id="dC" value="2000000" min="0" step="100000"></label>
+        <label class="f">Durata rampa <span class="u">s</span><input type="number" id="dT" value="60" min="0.1" step="5"></label>
+      </div>
+      <p class="note">Una molla assiale collega il disco inferiore a quello superiore e si oppone all'allungamento del tubo: F = k·Δ + k<sub>3</sub>·Δ³, con Δ l'allungamento oltre la corsa libera. La molla entra nel percorso di equilibrio, quindi cambia la curva p–V. Lo smorzatore aggiunge una forza c·v proporzionale alla velocità di apertura: non cambia gli equilibri ma frena l'apertura nel tempo. Con c &gt; 0 "Simula carico" integra il moto lungo il percorso di equilibrio (modello a un grado di libertà, inerzia trascurata): la pressione sale fino a p massima nella durata della rampa e l'apertura segue con il ritardo imposto dallo smorzatore. Con c = 0 resta la simulazione quasi statica con lo scatto a pressione costante.</p>
+    </details>
+    <div class="row"><button class="go" id="bPath">Calcola apertura</button><div class="bar"><div id="barIn"></div></div></div>
+    <div class="chartrow">
+      <canvas id="chart" aria-label="Pressione in funzione del rapporto di espansione volumetrico"></canvas>
+      <canvas id="prof" aria-label="Profilo del raggio lungo l'asse"></canvas>
+    </div>
+    <label class="f">Stato sul percorso di equilibrio (controllo di volume)
+      <input type="range" id="scrub" min="0" max="100" value="0" step="1" style="width:100%;margin-top:6px">
+    </label>
+    <div class="grid3">
+      <label class="f">p massima <span class="u">atm</span><input type="number" id="pmax" value="0.9" step="0.05" min="0"></label>
+      <label class="f">p finale <span class="u">atm</span><input type="number" id="phold" value="0.9" step="0.05" min="0"></label>
+      <div style="display:flex;align-items:flex-end"><button class="go" id="bSim" style="width:100%">Simula carico</button></div>
+    </div>
+    <p class="note">Il carico sale fino a p massima e poi scende fino a p finale. Con p finale = 0 resta solo ciò che è bistabile; una piccola pressione di mantenimento conserva le forme che da sole si richiuderebbero.</p>
+    <div class="row" style="align-items:center;gap:8px;flex-wrap:wrap">
+      <select id="recFmt" aria-label="Formato video"><option value="gif">GIF</option><option value="avi">AVI (MJPEG)</option></select>
+      <button class="ghost" id="bRec">Esporta video dell'apertura</button>
+      <label class="chk" style="margin:0"><input type="checkbox" id="recKeep"> Mantieni l'inquadratura attuale</label>
+    </div>
+    <div class="msg" id="recMsg"></div>
+    <div class="row" style="align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">
+      <select id="sheetStyle" aria-label="Stile della tavola"><option value="bn">Bianco e nero (linee)</option><option value="grigi">Scala di grigi</option><option value="colore">Colori essenziali</option></select>
+      <select id="sheetFmt" aria-label="Formato tavola"><option value="png">PNG 3840 × 2160</option><option value="svg">SVG vettoriale</option></select>
+      <button class="ghost" id="bSheet">Esporta tavola tecnica 16:9</button>
+    </div>
+    <div class="msg" id="sheetMsg"></div>
+    <div class="row" style="align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">
+      <select id="stlMode" aria-label="Dettaglio STL"><option value="lite">STL leggero</option><option value="full">STL completo (come a video)</option></select>
+      <button class="ghost" id="bStl">Esporta STL chiusa + aperta</button>
+    </div>
+    <p class="note" style="margin-top:4px">ZIP con due STL binari in mm, scala reale, asse del tubo lungo z. Contiene le parti accese nella vista. Il leggero unisce ogni Y in un solo prisma e toglie cerniere, perni e suddivisioni: pesa circa 5 volte meno.</p>
+    <div>
+    </div>
+    <div class="msg" id="stlMsg"></div>
+    <p class="note">La tavola tecnica riunisce la cella quotata, la tabella delle righe, i prospetti chiuso e aperto alla pressione massima alla stessa scala con le quote principali, i dati di geometria, cerniere e apertura, il profilo r(z) e un cartiglio. Registra la stessa simulazione di "Simula carico" (pressioni, dispositivo interno, elementi visibili) su sfondo bianco, con pressione e V/V₀ in sovrimpressione. Senza la spunta l'inquadratura si adatta alla forma finale. Il file si salva dalla versione offline del tool.</p>
+    <div class="info" id="siminfo"></div>
+    <div class="state" id="simstate"></div>
+    <p class="note">Modello 3D a colonna con simmetria ciclica: una colonna di celle su tutta l'altezza, corpi rigidi a 6 gradi di libertà, cerniere tipo bushing (k traslazionale, k<sub>θ</sub> attorno alla normale, k<sub>b</sub> flessionale fuori piano). La pressione compie lavoro sul volume racchiuso dal profilo dei vertici. Con i bulkhead i nodi di bordo sono incernierati ai dischi (rotazione libera solo attorno all'asse tangente del perno), il disco inferiore è fisso, quello superiore scorre lungo l'asse ed è spinto dalla pressione (p·πR²). Il percorso è calcolato a volume imposto, come se si iniettasse un fluido, e da lì si ricava la risposta a pressione imposta. Contatti e compenetrazioni non sono modellati.</p>
+  </section>
+
+  <section class="step" id="cbSec">
+    <div class="step-head"><span class="n">6</span><h2>Bladder nella struttura</h2><span class="pill" id="pC">da generare</span></div>
+    <p class="note">Dispiegamento della membrana insieme alla parte rigida. La membrana è la stessa della scheda "Bladder / restraint": un solo strato equivalente, tagliato sulla forma finale, con molle assiali sui lati e molle torsionali sugli angoli diedri. È unita alla struttura solo al centro delle Y, che non ruotano, e non a tutte: un livello di Y ogni n. Siccome i livelli delle Y sono sfalsati di mezza cella, gli attacchi risultano a quinconce. Per il resto la membrana è premuta contro le piastre (o, più semplice, contro la faccia interna ridotta a una superficie di rivoluzione); così non si arrotonda dove la struttura non è ancora aperta.</p>
+    <div class="grid3">
+      <label class="f">EA membrana <span class="u">kN/m</span><input type="number" id="cEA" value="10000" min="1" step="1000"></label>
+      <label class="f">Rigidezza flessionale D <span class="u">N·m</span><input type="number" id="cD" value="0.1" min="0" step="0.05"></label>
+      <label class="f">Gioco dalla parete <span class="u">mm</span><input type="number" id="cGap" value="5" min="0" step="1"></label>
+      <label class="f">Lato della mesh <span class="u">m</span><input type="number" id="cH" value="0.15" min="0.04" step="0.01"></label>
+      <label class="f">Attacchi: un livello di Y ogni<input type="number" id="cYe" value="3" min="1" step="1"></label>
+      <label class="f">p minima membrana <span class="u">atm</span><input type="number" id="cPmin" value="0.05" min="0" step="0.01"></label>
+    </div>
+    <label class="f">Contatto con la struttura
+      <select id="cCont">
+        <option value="plates" selected>Piastre vere, con spessore e attrito (solo i nodi vicini alla parete)</option>
+        <option value="env">Faccia interna liscia di rivoluzione (più veloce)</option>
+      </select>
+    </label>
+    <label class="f">Solutore
+      <select id="cSolv">
+        <option value="dr" selected>Rilassamento dinamico (esplicito, robusto con molti contatti)</option>
+        <option value="impl">Implicito alla Baraff–Witkin (gradienti coniugati, più veloce, transitori più bruschi)</option>
+      </select>
+    </label>
+    <label class="f">Piegatura iniziale
+      <select id="cFold">
+        <option value="sim" selected>Simulata: sottovuoto mentre la struttura si richiude</option>
+        <option value="geo">Geometrica: pieghe a soffietto imposte (più veloce)</option>
+      </select>
+    </label>
+    <div class="grid3">
+      <label class="f">Spessore membrana <span class="u">mm</span><input type="number" id="cThk" value="5" min="0" step="1"></label>
+      <label class="f">Depressione di piegatura <span class="u">atm</span><input type="number" id="cPv" value="0.02" min="0" step="0.01"></label>
+      <label class="f">Attrito in piegatura <span class="u">0–1</span><input type="number" id="cFr" value="0.3" min="0" max="0.95" step="0.05"></label>
+      <label class="f">Attrito in apertura <span class="u">0–1</span><input type="number" id="cFrD" value="0.1" min="0" max="0.95" step="0.05"></label>
+      <label class="f">Rigidezza flessionale in piegatura <span class="u">× D</span><input type="number" id="cDm" value="20" min="1" step="1"></label>
+      <label class="f">Pieghe imposte in circonferenza <span class="u">per settore</span><input type="number" id="cWH" value="1" min="1" step="1"></label>
+      <label class="f">Passo pieghe imposte lungo l'asse <span class="u">m</span><input type="number" id="cWZ" value="1" min="0.2" step="0.1"></label>
+    </div>
+    <p class="note"><b>Piegatura simulata</b> (come lo Shrinking di Blender, ma con la struttura). La membrana parte dalla forma finale dentro la struttura aperta. La struttura si richiude lungo il percorso del passo 5, al contrario, mentre nella membrana c'è una leggera depressione. Durante la piegatura il tessuto resiste anche a compressione (30% di EA), come il Compression di Blender, quindi invece di accorciarsi si piega da solo. La rigidezza flessionale decide la taglia delle pieghe (come il Bending di Blender: più alta, pieghe più larghe e meno numerose); per la piegatura è moltiplicata per il fattore indicato, nel dispiegamento torna D. L'attrito con la parete, l'autocontatto e gli attacchi decidono dove nascono le pieghe; il loro numero non è imposto. Le ultime 1000 iterazioni a struttura chiusa assestano le pieghe. Per il dispiegamento il tessuto torna a reagire solo a trazione, senza attrito. Le pieghe imposte (ultimi due campi) valgono solo per la piegatura geometrica.</p>
+    <label class="chk"><input type="checkbox" id="cSelf" checked> Autocontatto della membrana (punto-triangolo e lato-lato, spessore 15 mm)</label>
+    <div class="row"><button class="go" id="cBuild" disabled>Genera e piega bladder</button><button class="go" id="cRun" disabled>Simula dispiegamento</button><div class="bar"><div id="cBarIn"></div></div></div>
+    <div class="msg" id="cMsg"></div>
+    <canvas id="cChart" aria-label="Pressione nella membrana in funzione del volume della struttura, confrontata con il percorso a volume imposto"></canvas>
+    <label class="f">Stati registrati
+      <input type="range" id="cScrub" min="0" max="0" value="0" step="1" style="width:100%;margin-top:6px" disabled>
+    </label>
+    <div class="info" id="cInfo"></div>
+    <div class="state" id="cState"></div>
+    <p class="note"><b>Come avanza.</b> La struttura segue gli stati di equilibrio del percorso a volume imposto del passo 5, come se si pompasse fluido nel bladder; la colonna non risente della membrana (accoppiamento a una via). La struttura avanza solo quando la membrana l'ha riempita e gli attacchi non sono troppo carichi, quindi il percorso resta quasi statico. La membrana riceve la pressione del percorso, mai sotto la p minima, più un termine che la tiene piena: dove il percorso scende quasi a zero (durante lo scatto) la membrana resta comunque gonfia.</p>
+    <p class="note"><b>Contatto.</b> Con le piastre vere ogni nodo vicino alla parete cerca la piastra più vicina nel riferimento del corpo (con una cache, ricerca completa ogni 8 passi) e ne resta al di qua della faccia interna, meno lo spessore della membrana. Sulle fessure strette la piastra fa da ponte; sopra le aperture la membrana può entrare fino alla faccia esterna, durante la piegatura invece lì non è trattenuta (la depressione la tira dentro). L'attrito smorza la velocità tangente dei nodi a contatto. Una rete di sicurezza (la faccia interna lisciata, 12 cm più fuori) riprende i nodi per cui la proiezione sulla piastra non è affidabile. Gli attacchi comandano il loro intorno. <b>Autocontatto</b> come la self collision di Blender: ogni nodo resta ad almeno 15 mm da ogni triangolo non adiacente, e ogni lato da ogni altro lato, così due falde non si attraversano nemmeno incrociandosi fra i nodi; le coppie vicine si cercano in una tabella hash ogni 6 passi e si valutano a ogni passo. La colonna non risente della membrana. Il colore va dall'oro al rosso (5% di allungamento); Taglio a metà mostra l'interno.</p>
+    <p class="note"><b>Solutore implicito.</b> A ogni passo risolve (K + λ·M)·Δx = f con i gradienti coniugati senza costruire la matrice: K è la rigidezza tangente dei lati, la flessione linearizzata (Gauss–Newton) e i contatti come molle lungo la normale; la pressione seguace non entra in K. Con l'autocontatto nessun nodo può spostarsi in un passo più di 13,5 mm (90% dello spessore), altrimenti attraverserebbe l'altra falda: così il guadagno si perde e il predefinito resta il rilassamento dinamico.</p>
+  </section>
+
+
+  <section class="step">
+    <div class="step-head"><span class="n">≡</span><h2>Risultati</h2></div>
+    <div class="stats">
+      <div class="stat"><div class="k">Celle</div><div class="v" id="sCells">–</div></div>
+      <div class="stat"><div class="k">Blocchi</div><div class="v" id="sBlocks">–</div></div>
+      <div class="stat"><div class="k">Parti rotanti / esterne</div><div class="v" id="sParts">–</div></div>
+      <div class="stat"><div class="k">Cerniere</div><div class="v" id="sHinges">–</div></div>
+      <div class="stat"><div class="k">Pressione di innesco</div><div class="v" id="sPeak">–</div></div>
+      <div class="stat"><div class="k">V/V₀ aperto stabile</div><div class="v" id="sOpen">–</div></div>
+    </div>
+    <details>
+      <summary>Esporta parti e cerniere (configurazione chiusa)</summary>
+      <div class="row" style="margin-top:8px">
+        <button class="ghost" id="bExp">Genera testo</button>
+        <button class="ghost" id="bCopy">Copia</button>
+      </div>
+      <p class="note" style="margin-top:6px">Coordinate 3D in metri sulla superficie media (raggio R), asse del cilindro = z. PART: id, tipo (ROT/EST), blocco, riga, gruppo, n. vertici, poi x y z di ciascun vertice. HINGE: id, x, y, z, parte rotante, parte esterna, riga.</p>
+      <textarea id="exp" readonly spellcheck="false" style="margin-top:6px"></textarea>
+    </details>
+    <details>
+      <summary>Esporta per Simscape (tubo intero e una cella per riga)</summary>
+      <div class="grid2" style="margin-top:8px">
+        <label class="f">Densità piastre <span class="u">kg/m³</span><input type="number" id="aRho" value="1010" min="1" step="10"></label>
+        <label class="f">Smorzamento cerniere <span class="u">% di k</span><input type="number" id="aDamp" value="12" min="0" step="1"></label>
+        <label class="f">Rampa di pressione <span class="u">s</span><input type="number" id="aT" value="20" min="0.1" step="1"></label>
+        <label class="f">Durata prova della cella <span class="u">s</span><input type="number" id="aTc" value="20" min="0.1" step="1"></label>
+      </div>
+      <div class="row" style="margin-top:6px"><button class="ghost" id="bSim3">MATLAB / Simscape (ZIP)</button></div>
+      <div class="msg" id="aMsg"></div>
+      <p class="note" style="margin-top:6px">Modello Simscape Multibody a corpi rigidi: piastre rigide e un bushing per cerniera con le rigidezze della sua riga. <b>Tubo intero</b> senza bladder: estremità come scelte sopra, pressione come forza follower su ogni corpo con rampa fino a p massima e discesa a p finale. <b>Celle</b>: un periodo per riga con condizioni periodiche, lungo il percorso del modello periodico. Lo ZIP contiene lo script MATLAB da eseguire con Simscape Multibody.</p>
+    </details>
+  </section>
+</aside>
+<div class="vsplit" role="separator" aria-orientation="vertical" title="Trascina per cambiare la larghezza del pannello"></div>
+
+<main>
+  <div id="vp"></div>
+  <div class="overlay">
+    <div class="toolbar">
+      <label><input type="checkbox" id="vSurf" checked> Superficie</label>
+      <label><input type="checkbox" id="vMesh" checked> Mesh</label>
+      <label><input type="checkbox" id="vLat" checked><span class="sw" id="swLat"></span> Parti esterne</label>
+      <label><input type="checkbox" id="vRot" checked><span class="sw" id="swRot"></span> Parti rotanti</label>
+      <label><input type="checkbox" id="vCut" checked><span class="sw" id="swCut"></span> Tagli</label>
+      <label><input type="checkbox" id="vHin" checked><span class="sw" id="swHin"></span> Cerniere</label>
+      <label><input type="checkbox" id="vBulk" checked> Bulkhead</label>
+      <label><input type="checkbox" id="vBld" checked><span class="sw" id="swBld"></span> Bladder</label>
+      <label title="Nasconde la metà rivolta verso la vista iniziale, per vedere la membrana dentro la struttura"><input type="checkbox" id="vHalf"> Taglio a metà</label>
+      <label id="vUmbL" title="MMOD (concept): esagoni curvi di protezione sulle Y, su 4 livelli a raggi diversi; da aperti coprono la superficie"><input type="checkbox" id="vUmb"><span class="sw" style="background:linear-gradient(90deg,#4F8FBF,#7FAE45,#D1A23C,#A56BC0)"></span> MMOD <span id="umbNote" style="opacity:.7"></span></label>
+    </div>
+    <div class="toolbar"><button class="ghost" id="bView" style="border:0;padding:2px 4px">Ricentra vista</button></div>
+  </div>
+  <div class="cellbox"><div class="t" id="celltitle">Cella (sviluppata)</div><canvas id="cellcv"></canvas>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:4px;pointer-events:auto"><span class="note" style="margin:0">Salva il dettaglio:</span><button class="ghost" id="bCellSvg" style="padding:2px 8px">SVG</button><button class="ghost" id="bCellPng" style="padding:2px 8px">PNG</button><button class="ghost" id="bCellTo" style="padding:2px 8px" title="Porta questa cella (tipo, angolo di taglio, larghezza Y in proporzione) nella pagina Cella singola">→ Cella singola</button><span class="note" id="cellMsg" style="margin:0"></span></div></div>
+  <div class="hint">Trascina per ruotare · rotella per zoom · tasto destro per spostare</div>
+</main>
+</div>
+
+<div class="app plapp" id="pgPrint" hidden>
+<aside>
+  <header>
+    <h1>Stampa 3D</h1>
+    <p>Componenti rigidi della configurazione nella forma chiusa, cioè lo stato di riferimento senza tensioni: triangoli rotanti (T) e Y (le parti esterne unite attorno a ogni nodo). Le cerniere sono <b>inserti in TPU a tridente</b> da montare dopo la stampa, uno per ogni punta di braccio delle Y. Alla punta l'inserto è largo: riempie una tasca della Y lungo i due tagli, si ferma poco prima dello spigolo di ciascun triangolo e continua lungo l'asse del braccio con una coda di rondine che lo blocca nella Y. Da lì una striscia corta passa lo spigolo ed entra nella sede del triangolo lungo la bisettrice, così la rotazione avviene vicino allo spigolo anche quando la Y è larga. I bulkhead si stampano come dischi con un'aletta per ogni nodo di bordo, collegata alla colonna da un inserto TPU piatto. I pezzi uguali a meno di un moto rigido compaiono una sola volta, con la quantità nella distinta.</p>
+  </header>
+
+  <section class="step">
+    <div class="step-head"><span class="n">1</span><h2>Parametri di stampa</h2><span class="pill" id="p6">–</span></div>
+    <div class="grid3">
+      <label class="f">Scala 1 : <input type="number" id="pScale" value="20" min="1" step="1"></label>
+      <label class="f">Gioco taglio <span class="u">mm</span><input type="number" id="pGap" value="0.4" min="0.05" step="0.05"></label>
+      <label class="f">Spessore stampa <span class="u">mm</span><input type="number" id="pThk" value="" min="0.2" step="0.05" placeholder="s in scala"></label>
+    </div>
+    <label class="chk"><input type="checkbox" id="pFlat" checked> Faccia esterna piana: si stampa senza supporti</label>
+    <p class="note">Con la faccia piana si aggiunge materiale solo sul lato esterno, fino al piano tangente al pezzo. La superficie interna resta il cilindro liscio. Il pezzo va sul piatto con la faccia piana e la parte concava verso l'alto; i fianchi restano radiali, quindi i pezzi vicini non si toccano.</p>
+  </section>
+
+  <section class="step">
+    <div class="step-head"><span class="n">2</span><h2>Inserti TPU a tridente</h2></div>
+    <div class="grid3">
+      <label class="f">Raggio bottone <span class="u">mm</span><input type="number" id="pHead" value="1.1" min="0.2" step="0.1"></label>
+      <label class="f">Bottone nel triangolo <span class="u">mm dallo spigolo</span><input type="number" id="pDTri" value="3.2" min="0.2" step="0.1"></label>
+      <label class="f">Larghezza rami <span class="u">mm</span><input type="number" id="pNeck" value="0.8" min="0.1" step="0.1"></label>
+      <label class="f">Aggancio nella Y <span class="u">mm di profondità</span><input type="number" id="pWp" value="1.6" min="0.3" step="0.1"></label>
+      <label class="f">Tratto libero <span class="u">mm dallo spigolo</span><input type="number" id="pLf" value="1.2" min="0.2" step="0.1"></label>
+      <label class="f">Tratto libero nel triangolo <span class="u">mm, punta tagliata</span><input type="number" id="pLt" value="1.0" min="0" step="0.1"></label>
+      <label class="f">Coda di rondine: collo <span class="u">mm</span><input type="number" id="pDvN" value="1.0" min="0.3" step="0.1"></label>
+      <label class="f">Coda: testa <span class="u">mm</span><input type="number" id="pDvW" value="2.2" min="0.5" step="0.1"></label>
+      <label class="f">Coda: lunghezza <span class="u">mm</span><input type="number" id="pDvL" value="1.8" min="0.3" step="0.1"></label>
+      <label class="f">Gioco sede <span class="u">mm</span><input type="number" id="pClr" value="0.05" min="0" step="0.05"></label>
+      <label class="f">Parete minima <span class="u">mm</span><input type="number" id="pWall" value="0.4" min="0.1" step="0.1"></label>
+      <label class="f">E TPU <span class="u">MPa</span><input type="number" id="pEt" value="26" min="0.1" step="1"></label>
+      <label class="f">Densità rigido <span class="u">g/cm³</span><input type="number" id="pRho" value="1.24" min="0.1" step="0.01"></label>
+      <label class="f">Densità TPU <span class="u">g/cm³</span><input type="number" id="pRhoT" value="1.21" min="0.1" step="0.01"></label>
+    </div>
+    <p class="note">L'aggancio nella Y è la parte larga dell'inserto: una fascia a V lungo i tagli della punta del braccio, profonda quanto indicato (ridotta dove serve a lasciare la parete minima). Dal vertice interno della V parte la coda di rondine lungo l'asse del braccio: più larga in fondo che al collo, impedisce all'inserto di sfilarsi verso il taglio; si monta premendolo dall'alto. Nei bracci stretti la coda viene ridotta in proporzione. Il tratto libero è la lunghezza della striscia fra la fine dell'aggancio e lo spigolo del triangolo: più è corto, più la rotazione si concentra sullo spigolo, ma più si deforma il TPU.</p>
+  </section>
+
+  <section class="step">
+    <div class="step-head"><span class="n">3</span><h2>Bulkhead</h2></div>
+    <div class="grid3">
+      <label class="f">Spessore disco <span class="u">mm</span><input type="number" id="pTb" value="3" min="0.4" step="0.5"></label>
+      <label class="f">Larghezza aletta <span class="u">mm</span><input type="number" id="pWL" value="6" min="1" step="0.5"></label>
+      <label class="f">Foro centrale <span class="u">Ø mm</span><input type="number" id="pRc" value="0" min="0" step="1"></label>
+      <label class="f">Bottone <span class="u">mm dalla luce</span><input type="number" id="pDY" value="2.4" min="0.2" step="0.1"></label>
+      <label class="f">Luce cerniera <span class="u">mm</span><input type="number" id="pGb" value="1.5" min="0.2" step="0.1"></label>
+      <label class="f">Striscia TPU <span class="u">mm di larghezza</span><input type="number" id="pWb" value="1.6" min="0.3" step="0.1"></label>
+    </div>
+    <p class="note">Solo con estremità a bulkhead (pagina "Progetto e simulazione"). Il disco va sul piatto con le alette verso l'alto; ogni aletta sta nel piano della parete, sotto il nodo di bordo. L'inserto TPU attraversa la luce fra aletta e nodo e si flette nello spessore: la cerniera ruota attorno alla tangente, come il perno del modello, e resta rigida nelle altre direzioni.</p>
+  </section>
+
+  <section class="step">
+    <div class="step-head"><span class="n">4</span><h2>Componenti e distinta</h2></div>
+    <div class="row"><button class="go" id="bPrint">Genera componenti</button><button class="ghost" id="bZip" disabled>Scarica ZIP (STL + distinta)</button><button class="ghost" id="bCsv" disabled>Copia distinta</button></div>
+    <div class="msg" id="pMsg"></div>
+    <div class="info" id="pInfo"></div>
+    <div class="tblwrap" style="max-height:none"><table class="rows" id="bom"><thead><tr><th>Codice</th><th>Tipo</th><th>Righe</th><th>Q.tà</th><th>Ingombro [mm]</th><th>Massa [g]</th><th>Note</th></tr></thead><tbody id="bomBody"></tbody></table></div>
+    <p class="note" id="pNote">File STL in mm alla scala di stampa, già orientati per il piatto. Clicca una riga della distinta per vedere il pezzo; i componenti si aggiornano quando cambi la configurazione nella pagina "Progetto e simulazione".</p>
+  </section>
+</aside>
+<div class="vsplit" role="separator" aria-orientation="vertical" title="Trascina per cambiare la larghezza del pannello"></div>
+
+<main>
+  <div id="pv"></div>
+  <div class="overlay">
+    <div class="toolbar">
+      <span class="seg" role="radiogroup" aria-label="Vista">
+        <button id="pvAsm" aria-pressed="true">Assieme</button><button id="pvOne" aria-pressed="false">Pezzo</button>
+      </span>
+      <label><input type="checkbox" id="pvRig" checked><span class="sw" id="swPRig"></span> Parti rigide</label>
+      <label><input type="checkbox" id="pvTpu" checked><span class="sw" style="background:#9A86E6"></span> Inserti TPU</label>
+      <label><input type="checkbox" id="pvCol"> Solo una colonna</label>
+    </div>
+    <div class="toolbar"><button class="ghost" id="pvFit" style="border:0;padding:2px 4px">Ricentra vista</button></div>
+  </div>
+  <div class="cellbox" id="pvCard" hidden><div class="t" id="pvCardT"></div><div class="info" id="pvCardI" style="min-width:210px"></div></div>
+  <div class="hint">Trascina per ruotare · rotella per zoom · tasto destro per spostare</div>
+</main>
+</div>
+
+<div class="app plapp" id="pgBld" hidden>
+<aside>
+  <header>
+    <h1>Bladder / restraint</h1>
+    <p>Solo la parte flessibile, senza le parti rigide. Membrana equivalente a un solo strato, tagliata sulla forma finale: la struttura aperta alla pressione di esercizio, spostata verso l'interno di s/2 più il gioco e chiusa sui due dischi con un collare. Mesh di triangoli: i lati sono molle assiali (rigidezza di membrana EA, solo trazione), ogni lato interno ha una molla torsionale sull'angolo diedro (rigidezza flessionale D, riposo = forma finale), le facce ricevono la pressione. Si parte dalla membrana piegata come starebbe dentro la struttura chiusa e la si gonfia: senza gravità e senza vincoli esterni, i due dischi scorrono lungo l'asse in versi opposti, spinti dalla pressione e trattenuti dalla membrana.</p>
+  </header>
+
+  <section class="step">
+    <div class="step-head"><span class="n">1</span><h2>Forma finale</h2><span class="pill" id="pB">da generare</span></div>
+    <p class="note">Si ricava dalla pagina "Progetto e simulazione": profilo dei nodi delle Y nella struttura aperta alla p massima del passo 5, con estremità a bulkhead. Cambiando la struttura il bladder va rigenerato.</p>
+    <div class="info" id="bShape"></div>
+    <div class="msg" id="bMsg"></div>
+  </section>
+
+  <section class="step">
+    <div class="step-head"><span class="n">2</span><h2>Membrana</h2></div>
+    <div class="grid3">
+      <label class="f">EA membrana <span class="u">kN/m</span><input type="number" id="bEA" value="10000" min="1" step="1000"></label>
+      <label class="f">Rigidezza flessionale D <span class="u">N·m</span><input type="number" id="bD" value="0.1" min="0" step="0.05"></label>
+      <label class="f">Gioco dalla parete <span class="u">mm</span><input type="number" id="bGap" value="5" min="0" step="1"></label>
+      <label class="f">Lato della mesh <span class="u">m</span><input type="number" id="bH" value="0.1" min="0.04" step="0.01"></label>
+      <label class="f">Pieghe in circonferenza <span class="u">per settore</span><input type="number" id="bWH" value="1" min="1" step="1"></label>
+      <label class="f">Passo pieghe lungo l'asse <span class="u">m</span><input type="number" id="bWZ" value="1" min="0.2" step="0.1"></label>
+    </div>
+    <label class="chk"><input type="checkbox" id="bSelf" checked> Autocontatto della membrana (punto-triangolo e lato-lato, spessore 15 mm)</label>
+    <p class="note">EA = 10 MN/m è l'ordine di grandezza di un restraint in fibra aramidica o Vectran: a 0,9 atm e r = 3,5 m la tensione in circonferenza è p·r ≈ 320 kN/m, cioè circa il 3% di allungamento. Con lato 0,1 m la mesh ha circa 28 000 nodi su tutto il tubo; con lato più grande il calcolo è più veloce ma le pieghe sono più grossolane.</p>
+  </section>
+
+  <section class="step">
+    <div class="step-head"><span class="n">3</span><h2>Gonfiaggio</h2></div>
+    <div class="grid3">
+      <label class="f">p massima <span class="u">atm</span><input type="number" id="bPmax" value="" min="0.01" step="0.05" placeholder="= passo 5"></label>
+      <label class="f">Iterazioni di rampa<input type="number" id="bNup" value="1500" min="100" step="500"></label>
+      <label class="f">Iterazioni max a p costante<input type="number" id="bNh" value="15000" min="500" step="1000"></label>
+    </div>
+    <label class="f">Solutore
+      <select id="bSolv">
+        <option value="dr" selected>Rilassamento dinamico (esplicito)</option>
+        <option value="impl">Implicito (alla Baraff–Witkin, gradienti coniugati)</option>
+      </select>
+    </label>
+    <div class="row"><button class="go" id="bBuild" disabled>Genera bladder</button><button class="go" id="bInfl" disabled>Simula gonfiaggio</button><div class="bar"><div id="bBarIn"></div></div></div>
+    <canvas id="bChart" aria-label="Pressione in funzione del volume della membrana rispetto alla forma finale"></canvas>
+    <label class="f">Stati registrati
+      <input type="range" id="bScrub" min="0" max="0" value="0" step="1" style="width:100%;margin-top:6px" disabled>
+    </label>
+    <div class="info" id="bInfo"></div>
+    <div class="state" id="bState"></div>
+    <p class="note"><b>Calcolo.</b> Rilassamento dinamico con masse fittizie adattive e smorzamento cinetico: le iterazioni sono un tempo fittizio, il percorso è quasi statico. Dopo 200 iterazioni a p = 0 per assestare le pieghe, la pressione sale in rampa e poi resta costante; il calcolo si ferma da solo quando il volume non cambia più. L'autocontatto tiene ogni nodo ad almeno 15 mm dai triangoli non adiacenti e ogni lato dagli altri lati, così le falde non si compenetrano.</p>
+    <p class="note"><b>Piegatura iniziale.</b> Ogni punto della membrana segue all'indietro il moto di chiusura del reticolo dei nodi delle Y, fino alla parete della struttura chiusa; il tessuto in eccesso diventa pieghe a soffietto incrociate verso l'interno. Il numero di semionde si sceglie al passo 2: una piega per settore in circonferenza (12 attorno al tubo con N<sub>c</sub> = 12) e una piega ogni metro lungo l'asse. Meno pieghe vuol dire pieghe più profonde, perché devono raccogliere lo stesso tessuto.</p>
+    <p class="note"><b>Cosa guardare.</b> Il colore va dall'oro (tessuto lasco o appena teso) al rosso (5% di allungamento). Le linee grigie sono la forma finale. Prima si apre la parte centrale, poi le pieghe lungo l'asse si distendono e i due dischi si allontanano in modo simmetrico; alla fine V supera di poco la forma finale per l'allungamento elastico.</p>
+  </section>
+</aside>
+<div class="vsplit" role="separator" aria-orientation="vertical" title="Trascina per cambiare la larghezza del pannello"></div>
+
+<main>
+  <div id="bv"></div>
+  <div class="overlay">
+    <div class="toolbar">
+      <label><input type="checkbox" id="bvMem" checked><span class="sw" id="swBldT"></span> Membrana</label>
+      <label><input type="checkbox" id="bvGhost" checked><span class="sw" style="background:var(--muted)"></span> Forma finale</label>
+      <label><input type="checkbox" id="bvDisk" checked><span class="sw" style="background:var(--bulk)"></span> Dischi</label>
+      <label title="Nasconde la metà rivolta verso la vista iniziale, per vedere l'interno"><input type="checkbox" id="bvHalf"> Taglio a metà</label>
+    </div>
+    <div class="toolbar"><button class="ghost" id="bvFit" style="border:0;padding:2px 4px">Ricentra vista</button></div>
+  </div>
+  <div class="hint">Trascina per ruotare · rotella per zoom · tasto destro per spostare</div>
+</main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/clipper-lib@6.4.2/clipper.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/earcut@2.2.4/dist/earcut.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/model/geometry.js"></script>
+<script src="js/model/algebra3d.js"></script>
+<script src="js/model/column.js"></script>
+<script src="js/model/periodic.js"></script>
+<script src="js/print/print-parts.js"></script>
+<script src="js/bladder/bladder-model.js"></script>
+<script src="js/ui/common.js"></script>
+<script src="js/ui/rows.js"></script>
+<script src="js/model/assembly.js"></script>
+<script src="js/view/scene3d.js"></script>
+<script src="js/view/cell2d.js"></script>
+<script src="js/sim/path.js"></script>
+<script src="js/export/video.js"></script>
+<script src="js/export/drawings.js"></script>
+<script src="js/export/stl-model.js"></script>
+<script src="js/ui/charts.js"></script>
+<script src="js/ui/mlplot.js"></script>
+<script src="js/ui/pipeline.js"></script>
+<script src="js/bladder/bladder-page.js"></script>
+<script src="js/bladder/bladder-in-structure.js"></script>
+<script src="js/util/zip.js"></script>
+<script src="js/print/print-page.js"></script>
+<script src="js/ui/nav.js"></script>
+<script src="js/export/rigid.js"></script>
+<script src="js/export/templates/simscape-m.js"></script>
+<script src="js/export/simscape.js"></script>
+<script src="js/export/text-export.js"></script>
+<script src="js/planar/solver.js"></script>
+<script src="js/planar/models.js"></script>
+<script src="js/planar/pages.js"></script>
+<script src="js/planar/doc.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
