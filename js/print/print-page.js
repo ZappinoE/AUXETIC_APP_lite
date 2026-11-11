@@ -1,7 +1,7 @@
 /* ---------- scheda Stampa 3D ---------- */
 var PRINT=null;
-const canSave=location.protocol==='file:';
 let DL=null;   // capacità "downloads" della pagina pubblicata (null = non disponibile)
+const canSave=(typeof DL==='undefined'||!DL);   // senza DL si scarica con il normale download del browser
 (async()=>{ try{ if(window.claude&&typeof window.claude.use==='function'){ DL=await window.claude.use('downloads'); if(PRINT) renderBom(); } }catch(e){ DL=null; } })();
 function printOpts(){
   const P=cur.P, N=Math.max(1,+$('pScale').value||20), k=1000/N;

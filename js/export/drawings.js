@@ -71,7 +71,7 @@ async function svgToPng(svg,W,H,scale){
   x.fillStyle='#FFFFFF'; x.fillRect(0,0,c.width,c.height); x.drawImage(img,0,0,c.width,c.height);
   return await new Promise(r=>c.toBlob(r,'image/png'));
 }
-const canSaveFiles=()=>location.protocol==='file:'||(typeof DL!=='undefined'&&!!DL);
+const canSaveFiles=()=>true;   // download normale del browser, oppure DL se l'host lo fornisce (vedi saveBlob)
 async function saveCell(kind){
   const msg=$('cellMsg'); if(!cur||!cur.A.valid){ msg.textContent='Genera prima le celle.'; return; }
   if(!canSaveFiles()){ msg.textContent='Il salvataggio funziona nella versione offline del tool.'; return; }

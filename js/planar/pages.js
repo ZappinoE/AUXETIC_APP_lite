@@ -433,7 +433,7 @@ function plModelJSON(S,R){
 }
 async function plExport(S,what){
   const px=S.px, msg=$(px+'XMsg'); msg.textContent='';
-  let R; try{ plBuild(S); R=plReady(S); }catch(e){ msg.textContent=e.message; return; }
+  let R; try{ R=plReady(S); }catch(e){ msg.textContent=e.message; return; }   // senza plBuild: ricostruire il modello azzererebbe i risultati da esportare
   const name=(S.kind==='cell'?'cella':'piano')+'_'+S.par.type;
   if(what==='json'){ const ok=await saveBlob(new Blob([JSON.stringify(plModelJSON(S,R),null,1)],{type:'application/json'}),name+'.json'); msg.textContent=ok?'Salvato '+name+'.json':'Salvataggio non riuscito: usa la versione offline.'; return; }
   if(what==='csv'){

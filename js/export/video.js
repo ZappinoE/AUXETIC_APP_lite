@@ -53,14 +53,15 @@ function aviMjpeg(frames,w,h,fps){
   return cat([str('RIFF'),u32(body.length),body]);
 }
 function saveBlob(blob,fname){
-  if(location.protocol==='file:'){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},4000); return Promise.resolve(true); }
+  // ambiente con DL (salvataggio dell'host): lo si usa; altrimenti download normale del browser (file:, localhost, pagina web)
   if(typeof DL!=='undefined'&&DL) return DL.save({filename:fname,data:blob}).then(()=>true,()=>false);
-  return Promise.resolve(false);
+  try{ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},4000); return Promise.resolve(true); }
+  catch(e){ return Promise.resolve(false); }
 }
 async function recordVideo(){
   const msg=$('recMsg');
   if(!PATH||!PATH.done){ msg.textContent='Calcola prima l\'apertura (pulsante "Calcola apertura").'; return; }
-  if(location.protocol!=='file:'&&!(typeof DL!=='undefined'&&DL)){ msg.textContent='In questa vista il salvataggio dei file non è disponibile: apri la versione offline del tool (file HTML sul tuo computer) e registra da lì.'; return; }
+  if(false){ msg.textContent='In questa vista il salvataggio dei file non è disponibile: apri la versione offline del tool (file HTML sul tuo computer) e registra da lì.'; return; }
   const fmtV=$('recFmt').value, gif=fmtV==='gif', fps=gif?12:25, maxW=gif?640:1280;
   const keep=$('recKeep').checked, camPos=camera.position.clone(), tgt=controls.target.clone();
   stopSim(); REC={}; $('bRec').disabled=true; $('bSim').disabled=true;
